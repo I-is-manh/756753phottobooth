@@ -1,0 +1,385 @@
+<!doctype html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>PhotoBooth — Custom & Download</title>
+  <style>
+    :root{--accent:#ffb400;--bg:#0f1724;--card:#0b1320;color-scheme: dark}
+    html,body{height:100%;margin:0;font-family:Inter,Segoe UI,system-ui,Arial;background:linear-gradient(180deg,#071025 0%, #07142a 60%);color:#e6eef8}
+    .wrap{max-width:1100px;margin:28px auto;padding:20px;display:grid;grid-template-columns:1fr 420px;gap:20px}
+    .card{background:linear-gradient(180deg,rgba(255,255,255,0.03),rgba(255,255,255,0.01));border-radius:12px;padding:16px;box-shadow:0 6px 20px rgba(2,6,23,0.6)}
+    header{display:flex;align-items:center;gap:12px;margin-bottom:12px}
+    header h1{font-size:18px;margin:0}
+    .stage{display:flex;flex-direction:column;gap:10px}
+    video,canvas{width:100%;height:auto;border-radius:8px;background:#081223}
+    .controls{display:flex;gap:8px;flex-wrap:wrap}
+    button,select,input[type=text],label{background:transparent;border:1px solid rgba(255,255,255,0.08);color:inherit;padding:8px 10px;border-radius:8px}
+    button{cursor:pointer}
+    .sidebar{display:flex;flex-direction:column;gap:12px}
+    .thumbs{display:flex;gap:8px;flex-wrap:wrap}
+    .sticker{width:76px;height:76px;display:flex;align-items:center;justify-content:center;border-radius:8px;border:1px dashed rgba(255,255,255,0.06);cursor:pointer;font-size:38px}
+    label[for=file]{display:inline-block;padding:8px 10px;border-radius:8px;cursor:pointer}
+    .filter-row{display:flex;gap:6px;align-items:center}
+    .footer-hint{font-size:13px;color:rgba(230,238,248,0.7)}
+    .small{font-size:13px}
+    .selected{outline:2px solid var(--accent)}
+    .sticker-list{max-height:220px;overflow:auto;padding:6px}
+    .top-row{display:flex;gap:8px;align-items:center}
+    @media(max-width:980px){.wrap{grid-template-columns:1fr;padding:12px}}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <header>
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" aria-hidden><path d="M4 7h3l2-2h6l2 2h3v11a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V7z" stroke="currentColor" stroke-width="1.1" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <div>
+          <h1>PhotoBooth — chụp, tuỳ chỉnh & tải ảnh</h1>
+          <div class="small">Bật camera, chụp hoặc upload ảnh, thêm sticker/text, kéo thả rồi tải về.</div>
+        </div>
+      </header>
+
+      <div class="stage">
+        <video id="video" autoplay playsinline></video>
+        <canvas id="canvas"></canvas>
+
+        <div class="controls">
+          <button id="startCam">Bật camera</button>
+          <button id="capture">Chụp</button>
+          <label for="file">Tải ảnh lên</label>
+          <input id="file" type="file" accept="image/*" style="display:none">
+          <select id="ratio">
+            <option value="auto">Tỷ lệ tự do</option>
+            <option value="1">Vuông 1:1</option>
+            <option value="4/3">4:3</option>
+            <option value="16/9">16:9</option>
+          </select>
+          <button id="clear">Xóa</button>
+          <button id="download">Tải ảnh về</button>
+        </div>
+
+        <div class="filter-row">
+          <label class="small">Bộ lọc:</label>
+          <select id="filter">
+            <option value="none">Mặc định</option>
+            <option value="grayscale">Đen trắng</option>
+            <option value="sepia">Sepia</option>
+            <option value="invert">Đảo màu</option>
+            <option value="brightness">Sáng hơn</option>
+          </select>
+          <label class="small">Khung:</label>
+          <select id="frame">
+            <option value="none">Không</option>
+            <option value="polaroid">Polaroid</option>
+            <option value="rounded">Viền bo</option>
+            <option value="film">Film strip</option>
+          </select>
+        </div>
+
+        <div class="footer-hint">Ghi chú: kéo sticker trên ảnh để đổi vị trí. Nhấn Delete để xoá sticker đang chọn.</div>
+      </div>
+    </div>
+
+    <aside class="card sidebar">
+      <div>
+        <div style="display:flex;justify-content:space-between;align-items:center">
+          <strong>Stickers & Text</strong>
+          <span class="small">Kéo để di chuyển</span>
+        </div>
+
+        <div class="sticker-list" id="stickerList">
+          <!-- emoji stickers -->
+          <div class="thumbs">
+            <div class="sticker" data-type="emoji">📸</div>
+            <div class="sticker" data-type="emoji">🎉</div>
+            <div class="sticker" data-type="emoji">😍</div>
+            <div class="sticker" data-type="emoji">✨</div>
+            <div class="sticker" data-type="emoji">🕶️</div>
+            <div class="sticker" data-type="emoji">🌸</div>
+            <div class="sticker" data-type="emoji">🔥</div>
+            <div class="sticker" data-type="emoji">🤍</div>
+          </div>
+        </div>
+
+        <div style="margin-top:12px;display:flex;gap:6px">
+          <input id="textInput" type="text" placeholder="Viết chữ..." />
+          <button id="addText">Thêm</button>
+        </div>
+
+        <div style="margin-top:10px;display:flex;gap:6px;align-items:center">
+          <label class="small">Kích thước</label>
+          <input id="size" type="range" min="12" max="160" value="48" />
+        </div>
+
+        <div style="margin-top:8px;display:flex;gap:6px;align-items:center">
+          <label class="small">Màu</label>
+          <input id="color" type="color" value="#ffffff" />
+        </div>
+
+        <div style="margin-top:12px;display:flex;gap:6px">
+          <button id="bringFront">Đưa lên trên</button>
+          <button id="delete">Xoá</button>
+        </div>
+
+        <hr style="margin:12px 0;border:none;border-top:1px solid rgba(255,255,255,0.04)"/>
+        <div>
+          <strong>Ảnh mẫu / Background</strong>
+          <div style="margin-top:8px;display:flex;gap:8px;flex-wrap:wrap">
+            <button class="bg-sample" data-src="pattern1">Mẫu 1</button>
+            <button class="bg-sample" data-src="pattern2">Mẫu 2</button>
+            <button class="bg-sample" data-src="pattern3">Mẫu 3</button>
+          </div>
+        </div>
+
+        <div style="margin-top:14px;color:rgba(230,238,248,0.7)" class="small">
+          Hướng dẫn nhanh: Bật camera -> Chụp hoặc Tải ảnh lên -> Chọn sticker hoặc viết chữ -> Kéo để sắp xếp -> Tải về.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+<script>
+// Elements
+const video = document.getElementById('video');
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+const startCamBtn = document.getElementById('startCam');
+const captureBtn = document.getElementById('capture');
+const fileInput = document.getElementById('file');
+const downloadBtn = document.getElementById('download');
+const clearBtn = document.getElementById('clear');
+const filterSel = document.getElementById('filter');
+const frameSel = document.getElementById('frame');
+const ratioSel = document.getElementById('ratio');
+const stickerList = document.getElementById('stickerList');
+const addTextBtn = document.getElementById('addText');
+const textInput = document.getElementById('textInput');
+const sizeRange = document.getElementById('size');
+const colorInput = document.getElementById('color');
+const bringFrontBtn = document.getElementById('bringFront');
+const deleteBtn = document.getElementById('delete');
+
+let stream = null;
+let backgroundImg = null;
+let stickers = []; // {type:'emoji'|'text', content, x,y,size,color, id}
+let selectedId = null;
+let pointerDown = false;
+let lastPointer = {x:0,y:0};
+let canvasW = 800, canvasH = 600;
+
+function setCanvasSizeFromContainer(){
+  const maxW = Math.min(860, document.querySelector('.card').clientWidth - 20);
+  // choose size based on ratio
+  const ratio = ratioSel.value;
+  if(ratio === '1') { canvasW = 800; canvasH = 800; }
+  else if(ratio === '4/3'){ canvasW = 800; canvasH = Math.round(800*3/4); }
+  else if(ratio === '16/9'){ canvasW = 900; canvasH = Math.round(900*9/16); }
+  else { canvasW = maxW; canvasH = Math.round(maxW * 3/4); }
+  canvas.width = canvasW; canvas.height = canvasH;
+}
+
+function startCamera(){
+  if(navigator.mediaDevices && navigator.mediaDevices.getUserMedia){
+    navigator.mediaDevices.getUserMedia({video:{width:1280,height:720}, audio:false})
+      .then(s => { stream = s; video.srcObject = s; video.play(); })
+      .catch(e => alert('Không thể bật camera: '+e.message));
+  } else alert('Trình duyệt không hỗ trợ camera');
+}
+
+startCamBtn.addEventListener('click', ()=>{
+  if(stream) { // stop
+    stream.getTracks().forEach(t=>t.stop()); stream=null; video.srcObject=null; startCamBtn.textContent='Bật camera';
+  } else { startCamera(); startCamBtn.textContent='Tắt camera'; }
+});
+
+captureBtn.addEventListener('click', ()=>{
+  setCanvasSizeFromContainer();
+  if(stream){
+    // draw current video frame to canvas
+    ctx.save(); ctx.clearRect(0,0,canvas.width,canvas.height);
+    // fit video into canvas
+    const vw = video.videoWidth, vh = video.videoHeight;
+    const scale = Math.max(canvas.width/vw, canvas.height/vh);
+    const sw = vw*scale, sh = vh*scale;
+    ctx.drawImage(video, (canvas.width-sw)/2, (canvas.height-sh)/2, sw, sh);
+    ctx.restore();
+    backgroundImg = new Image();
+    backgroundImg.src = canvas.toDataURL('image/png');
+  } else {
+    alert('Camera chưa bật');
+  }
+  render();
+});
+
+fileInput.addEventListener('change', e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const url = URL.createObjectURL(f);
+  const img = new Image(); img.onload = ()=>{
+    setCanvasSizeFromContainer();
+    // draw image fitted
+    ctx.clearRect(0,0,canvas.width,canvas.height);
+    const scale = Math.max(canvas.width/img.width, canvas.height/img.height);
+    const sw = img.width*scale, sh = img.height*scale;
+    ctx.drawImage(img, (canvas.width-sw)/2, (canvas.height-sh)/2, sw, sh);
+    backgroundImg = new Image(); backgroundImg.src = canvas.toDataURL();
+    URL.revokeObjectURL(url);
+    render();
+  };
+  img.src = url;
+});
+
+// sticker add (emoji click)
+stickerList.addEventListener('click', e=>{
+  const el = e.target.closest('.sticker'); if(!el) return;
+  const text = el.textContent.trim();
+  const id = Date.now() + Math.random();
+  stickers.push({id, type:'emoji', content:text, x:canvas.width/2 - 40, y:canvas.height/2 - 40, size:64, color:'#ffffff'});
+  selectedId = id; render();
+});
+
+addTextBtn.addEventListener('click', ()=>{
+  const txt = textInput.value.trim(); if(!txt) return;
+  const id = Date.now()+Math.random();
+  stickers.push({id,type:'text',content:txt,x:canvas.width/2-80,y:canvas.height/2-20,size:parseInt(sizeRange.value,10),color:colorInput.value});
+  selectedId = id; render(); textInput.value='';
+});
+
+sizeRange.addEventListener('input', ()=>{
+  const s = parseInt(sizeRange.value,10);
+  if(selectedId){ const st = stickers.find(s=>s.id===selectedId); if(st){ st.size = s; render(); }}
+});
+colorInput.addEventListener('input', ()=>{ if(selectedId){ const st = stickers.find(s=>s.id===selectedId); if(st){ st.color = colorInput.value; render(); }}});
+
+bringFrontBtn.addEventListener('click', ()=>{ if(selectedId){ const idx = stickers.findIndex(s=>s.id===selectedId); if(idx>=0){ const [it]=stickers.splice(idx,1); stickers.push(it); render(); }}});
+
+deleteBtn.addEventListener('click', ()=>{ if(selectedId){ stickers = stickers.filter(s=>s.id!==selectedId); selectedId=null; render(); }});
+
+clearBtn.addEventListener('click', ()=>{ backgroundImg=null; ctx.clearRect(0,0,canvas.width,canvas.height); stickers=[]; selectedId=null; });
+
+// background samples (simple patterns drawn via code)
+document.querySelectorAll('.bg-sample').forEach(b=>b.addEventListener('click', ()=>{
+  setCanvasSizeFromContainer();
+  const id = b.getAttribute('data-src');
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(id==='pattern1'){
+    // soft gradient
+    const g = ctx.createLinearGradient(0,0,canvas.width,canvas.height);
+    g.addColorStop(0,'#141e30'); g.addColorStop(1,'#243b55');
+    ctx.fillStyle = g; ctx.fillRect(0,0,canvas.width,canvas.height);
+  } else if(id==='pattern2'){
+    ctx.fillStyle='#101827'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    for(let i=0;i<60;i++){ ctx.fillStyle='rgba(255,255,255,0.02)'; ctx.beginPath(); ctx.arc(Math.random()*canvas.width, Math.random()*canvas.height, Math.random()*40+4,0,Math.PI*2); ctx.fill(); }
+  } else {
+    ctx.fillStyle='#061018'; ctx.fillRect(0,0,canvas.width,canvas.height);
+    ctx.fillStyle='rgba(255,255,255,0.02)'; ctx.fillRect(20,20,canvas.width-40,canvas.height-40);
+  }
+  backgroundImg = new Image(); backgroundImg.src = canvas.toDataURL(); render();
+}));
+
+// drawing/render pipeline
+function render(){
+  setCanvasSizeFromContainer();
+  // base
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  if(backgroundImg && backgroundImg.complete){
+    // fit background
+    const img = backgroundImg;
+    const scale = Math.max(canvas.width/img.width, canvas.height/img.height);
+    const sw = img.width*scale, sh = img.height*scale;
+    ctx.drawImage(img, (canvas.width-sw)/2, (canvas.height-sh)/2, sw, sh);
+  } else {
+    ctx.fillStyle='#081224'; ctx.fillRect(0,0,canvas.width,canvas.height);
+  }
+
+  // stickers
+  stickers.forEach(s => {
+    ctx.save();
+    ctx.textBaseline='top';
+    if(s.type==='emoji'){
+      ctx.font = `${s.size}px serif`;
+      ctx.fillText(s.content, s.x, s.y);
+    } else {
+      ctx.font = `${s.size}px sans-serif`;
+      ctx.fillStyle = s.color || '#fff';
+      // shadow for readability
+      ctx.shadowColor = 'rgba(0,0,0,0.6)'; ctx.shadowBlur = 8; ctx.fillText(s.content, s.x, s.y);
+    }
+    // outline if selected
+    if(selectedId === s.id){
+      const w = ctx.measureText(s.content).width || s.size;
+      const h = s.size + 6;
+      ctx.strokeStyle = 'rgba(255,180,0,0.9)'; ctx.lineWidth=2; ctx.strokeRect(s.x-6,s.y-6,w+12,h+6);
+    }
+    ctx.restore();
+  });
+
+  // frame overlay
+  const frame = frameSel.value;
+  if(frame==='polaroid'){
+    // light polaroid border
+    ctx.save(); ctx.globalAlpha=0.9; ctx.fillStyle='#ffffff'; ctx.fillRect(10,10,canvas.width-20,canvas.height-20); ctx.restore();
+    // re-draw content as inner (quick hack: draw a shadowed rectangle to simulate)
+  } else if(frame==='rounded'){
+    // rounded dark border
+    ctx.save(); ctx.lineWidth=18; ctx.strokeStyle='rgba(255,255,255,0.06)'; roundRect(ctx,9,9,canvas.width-18,canvas.height-18,20); ctx.stroke(); ctx.restore();
+  } else if(frame==='film'){
+    ctx.save(); for(let i=0;i<canvas.width;i+=40){ ctx.fillStyle='rgba(0,0,0,0.06)'; ctx.fillRect(i,0,6,canvas.height);} ctx.restore();
+  }
+
+  // filter: apply by getting imageData and using canvas composite (basic filters implemented)
+  const filter = filterSel.value;
+  if(filter !== 'none'){
+    const data = ctx.getImageData(0,0,canvas.width,canvas.height);
+    const d = data.data;
+    for(let i=0;i<d.length;i+=4){
+      const r=d[i], g=d[i+1], b=d[i+2];
+      if(filter==='grayscale'){ const v = 0.3*r+0.59*g+0.11*b; d[i]=d[i+1]=d[i+2]=v; }
+      else if(filter==='sepia'){ d[i]=Math.min(255, r*0.393 + g*0.769 + b*0.189); d[i+1]=Math.min(255, r*0.349 + g*0.686 + b*0.168); d[i+2]=Math.min(255, r*0.272 + g*0.534 + b*0.131); }
+      else if(filter==='invert'){ d[i]=255-r; d[i+1]=255-g; d[i+2]=255-b; }
+      else if(filter==='brightness'){ d[i]=Math.min(255, r*1.15); d[i+1]=Math.min(255, g*1.15); d[i+2]=Math.min(255, b*1.15); }
+    }
+    ctx.putImageData(data,0,0);
+  }
+}
+
+function roundRect(ctx, x, y, w, h, r){ if (w < 2 * r) r = w / 2; if (h < 2 * r) r = h / 2; ctx.beginPath(); ctx.moveTo(x+r, y); ctx.arcTo(x+w, y, x+w, y+h, r); ctx.arcTo(x+w, y+h, x, y+h, r); ctx.arcTo(x, y+h, x, y, r); ctx.arcTo(x, y, x+w, y, r); ctx.closePath(); }
+
+// Pointer events for dragging stickers on canvas
+canvas.addEventListener('pointerdown', e=>{
+  const rect = canvas.getBoundingClientRect(); const x = (e.clientX-rect.left)*(canvas.width/rect.width); const y = (e.clientY-rect.top)*(canvas.height/rect.height);
+  // find topmost sticker under pointer
+  for(let i=stickers.length-1;i>=0;i--){ const s = stickers[i];
+    let w = ctx.measureText(s.content).width || s.size; let h = s.size + 8;
+    if(x >= s.x-10 && x <= s.x + w + 10 && y >= s.y-10 && y <= s.y + h + 10){ selectedId = s.id; pointerDown=true; lastPointer={x,y}; render(); return; }
+  }
+  // clicked empty
+  selectedId=null; render();
+});
+
+canvas.addEventListener('pointermove', e=>{
+  if(!pointerDown || !selectedId) return;
+  const rect = canvas.getBoundingClientRect(); const x = (e.clientX-rect.left)*(canvas.width/rect.width); const y = (e.clientY-rect.top)*(canvas.height/rect.height);
+  const dx = x - lastPointer.x, dy = y - lastPointer.y; lastPointer={x,y}; const s = stickers.find(s=>s.id===selectedId); if(s){ s.x += dx; s.y += dy; render(); }
+});
+
+window.addEventListener('pointerup', ()=>{ pointerDown=false; });
+
+// keyboard delete
+window.addEventListener('keydown', e=>{ if(e.key==='Delete' || e.key==='Backspace'){ if(selectedId){ stickers = stickers.filter(s=>s.id!==selectedId); selectedId=null; render(); } }});
+
+// download
+downloadBtn.addEventListener('click', ()=>{
+  // final render to ensure filter applied
+  render();
+  const link = document.createElement('a'); link.download = 'photobooth.png'; link.href = canvas.toDataURL('image/png'); link.click();
+});
+
+// initial setup
+ratioSel.addEventListener('change', ()=>{ setCanvasSizeFromContainer(); render(); });
+filterSel.addEventListener('change', render); frameSel.addEventListener('change', render);
+setCanvasSizeFromContainer(); render();
+
+</script>
+</body>
+</html>
